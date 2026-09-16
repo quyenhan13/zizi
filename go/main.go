@@ -246,7 +246,11 @@ type envelope struct {
 }
 
 type registration struct {
-	ManagementAPI bool `json:"management_api"`
+	SchemaVersion uint32             `json:"schema_version"`
+	Metadata      pluginapi.Metadata `json:"metadata"`
+	Capabilities  struct {
+		ManagementAPI bool `json:"management_api"`
+	} `json:"capabilities"`
 }
 
 type managementRegistrationResponse struct {
@@ -358,9 +362,16 @@ func handleManagement(request []byte) ([]byte, error) {
 }
 
 func suiteRegistration() registration {
-	return registration{
-		ManagementAPI: true,
+	var reg registration
+	reg.SchemaVersion = 1
+	reg.Metadata = pluginapi.Metadata{
+		Name:             pluginDisplayName,
+		Version:          pluginVer,
+		Author:           "quyenhan13",
+		GitHubRepository: "https://github.com/quyenhan13/zizi",
 	}
+	reg.Capabilities.ManagementAPI = true
+	return reg
 }
 
 func mustJSON(v any) []byte {

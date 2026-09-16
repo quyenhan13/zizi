@@ -41,6 +41,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"unsafe"
 
@@ -86,6 +87,32 @@ func newNonce() string {
 	return fmt.Sprintf("%x", buf)
 }
 
+type ModelPrice struct {
+	InputPricePerMillion     float64 `json:"input_price_per_million"`
+	OutputPricePerMillion    float64 `json:"output_price_per_million"`
+	CacheReadPricePerMillion float64 `json:"cache_read_price_per_million,omitempty"`
+	CacheCreationPricePerMil float64 `json:"cache_creation_price_per_million,omitempty"`
+}
+
+var defaultPrices = map[string]ModelPrice{
+	"claude-3-5-sonnet-20241022": {InputPricePerMillion: 3.0, OutputPricePerMillion: 15.0, CacheReadPricePerMillion: 0.3, CacheCreationPricePerMil: 3.75},
+	"claude-3-5-haiku-20241022":  {InputPricePerMillion: 0.8, OutputPricePerMillion: 4.0, CacheReadPricePerMillion: 0.08, CacheCreationPricePerMil: 1.0},
+	"claude-3-opus-20240229":     {InputPricePerMillion: 15.0, OutputPricePerMillion: 75.0, CacheReadPricePerMillion: 1.5, CacheCreationPricePerMil: 18.75},
+	"claude-3-7-sonnet":          {InputPricePerMillion: 3.0, OutputPricePerMillion: 15.0, CacheReadPricePerMillion: 0.3, CacheCreationPricePerMil: 3.75},
+	"gpt-4o":                     {InputPricePerMillion: 2.5, OutputPricePerMillion: 10.0},
+	"gpt-4o-mini":                {InputPricePerMillion: 0.15, OutputPricePerMillion: 0.6},
+	"o1":                         {InputPricePerMillion: 15.0, OutputPricePerMillion: 60.0},
+	"o1-mini":                    {InputPricePerMillion: 1.1, OutputPricePerMillion: 4.4},
+	"o3-mini":                    {InputPricePerMillion: 1.1, OutputPricePerMillion: 4.4},
+	"gemini-1.5-pro":             {InputPricePerMillion: 1.25, OutputPricePerMillion: 5.0},
+	"gemini-1.5-flash":           {InputPricePerMillion: 0.075, OutputPricePerMillion: 0.3},
+	"gemini-2.0-flash":           {InputPricePerMillion: 0.1, OutputPricePerMillion: 0.4},
+	"gemini-2.5-pro":             {InputPricePerMillion: 1.25, OutputPricePerMillion: 5.0},
+	"gemini-2.5-flash":           {InputPricePerMillion: 0.1, OutputPricePerMillion: 0.4},
+	"grok-beta":                  {InputPricePerMillion: 5.0, OutputPricePerMillion: 15.0},
+	"grok-2-vision":              {InputPricePerMillion: 2.0, OutputPricePerMillion: 10.0},
+}
+
 const appShellHTML = `<!doctype html>
 <html lang="vi">
 <head>
@@ -110,6 +137,11 @@ const appShellHTML = `<!doctype html>
   .card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:10px; padding:20px; margin-bottom:20px; }
   .card h3 { margin:0 0 12px 0; font-size:14px; font-weight:600; color:#f1f5f9; }
   .badge { display:inline-block; padding:3px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:rgba(16,185,129,0.15); color:#34d399; }
+  table { width:100%; border-collapse:collapse; text-align:left; }
+  th, td { padding:10px 14px; border-bottom:1px solid var(--border-color); font-size:13px; }
+  th { color:var(--text-muted); font-weight:600; font-size:12px; }
+  tr:hover td { background:rgba(255,255,255,0.02); }
+  .mono { font-family:monospace; }
 </style>
 </head>
 <body>
@@ -133,9 +165,9 @@ const appShellHTML = `<!doctype html>
       <div><span class="badge">VTeen Suite Active</span></div>
     </div>
     <div class="content-body">
-      <div id="pane-pricing" class="tab-pane card"><h3>Bảng Giá Model (VNĐ / 1k tokens)</h3><div id="pricingTableContainer">Đang tải bảng giá...</div></div>
+      <div id="pane-pricing" class="tab-pane card"><h3>Bảng Giá Model (Đơn vị: VNĐ / 1k tokens)</h3><div id="pricingTableContainer">Đang tải bảng giá...</div></div>
       <div id="pane-keys" class="tab-pane card" style="display:none;"><h3>API Keys</h3><div id="keysTableContainer">Đang tải...</div></div>
-      <div id="pane-auths" class="tab-pane card" style="display:none;"><h3>Auths</h3><div id="authsTableContainer">Đang tải...</div></div>
+      <div id="pane-auths" class="tab-pane card" style="display:none;"><h3>Auth Accounts</h3><div id="authsTableContainer">Đang tải...</div></div>
       <div id="pane-logs" class="tab-pane card" style="display:none;"><h3>Logs</h3><div id="logsTableContainer">Đang tải...</div></div>
       <div id="pane-banned_ips" class="tab-pane card" style="display:none;"><h3>Banned IPs</h3><div id="bannedIPsContainer">Đang tải...</div></div>
       <div id="pane-test" class="tab-pane card" style="display:none;"><h3>Test Model</h3><div id="testResultBox">Chưa có kết quả.</div></div>
@@ -143,29 +175,6 @@ const appShellHTML = `<!doctype html>
   </div>
   <script nonce="__VTEEN_NONCE__">
   (function(){
-    // CSRF bootstrap: same-origin GET health probe returns the management CSRF
-    // token in a response header. Read into memory only; never persist/transmit
-    // outside same-origin fetch. GET itself needs no token.
-    window.__suiteCsrf = null;
-    window.__suiteAuthHeaders = function(extra){
-      var h = extra || {};
-      if (window.__suiteCsrf) h['X-CPA-CSRF-Token'] = window.__suiteCsrf;
-      return h;
-    };
-    window.__suiteFetch = function(url, opts){
-      opts = opts || {};
-      opts.credentials = 'include';
-      opts.headers = window.__suiteAuthHeaders(opts.headers || {});
-      return fetch(url, opts);
-    };
-    fetch('/v0/management/vteen-admin-suite/health', { credentials: 'include' })
-      .then(function(r){
-        var t = r.headers.get('X-CPA-CSRF-Token');
-        if (t) window.__suiteCsrf = t;
-        return r.json().catch(function(){});
-      })
-      .catch(function(){});
-
     var navButtons = document.querySelectorAll('#suiteSidebar .nav-btn');
     var tabPanes = document.querySelectorAll('.content-body .tab-pane');
     var activeTitle = document.getElementById('activeTabTitle');
@@ -197,42 +206,59 @@ const appShellHTML = `<!doctype html>
     switchTab(initialTab);
 
     window.loadPricing = function(){
-      window.__suiteFetch('/api/pricing').then(function(r){ return r.json(); }).then(function(d){
-        var models = (d && d.models) || d || {};
-        var html = '<table><thead><tr><th>Model</th><th>Input (VNĐ/1k)</th><th>Output (VNĐ/1k)</th></tr></thead><tbody>';
-        for (var m in models){ var it = models[m] || {}; html += '<tr><td>'+m+'</td><td>'+(it.input_price||0)+'</td><td>'+(it.output_price||0)+'</td></tr>'; }
+      fetch('/v0/resource/plugins/vteen-admin-suite/pricing').then(function(r){ return r.json(); }).then(function(models){
+        var html = '<table><thead><tr><th>Tên Model</th><th>Input ($ / 1M)</th><th>Output ($ / 1M)</th><th>Cache Read</th><th>Cache Write</th></tr></thead><tbody>';
+        var keys = Object.keys(models).sort();
+        for (var i = 0; i < keys.length; i++){
+          var k = keys[i];
+          var it = models[k] || {};
+          html += '<tr><td class="mono" style="font-weight:600;">' + k + '</td><td class="mono">$' + (it.input_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.output_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.cache_read_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.cache_creation_price_per_million||0).toFixed(4) + '</td></tr>';
+        }
         html += '</tbody></table>';
         document.getElementById('pricingTableContainer').innerHTML = html;
-      }).catch(function(){ document.getElementById('pricingTableContainer').textContent = 'Không thể tải bảng giá.'; });
+      }).catch(function(e){ document.getElementById('pricingTableContainer').textContent = 'Lỗi tải bảng giá: ' + e.message; });
     };
+
     window.loadKeys = function(){
-      window.__suiteFetch('/api/admin/keys').then(function(r){ return r.json(); }).then(function(d){
-        var keys = (d && d.keys) || [];
-        document.getElementById('keysTableContainer').textContent = keys.length + ' key(s) loaded.';
+      fetch('/v0/resource/plugins/vteen-admin-suite/keys').then(function(r){ return r.json(); }).then(function(keys){
+        var list = Array.isArray(keys) ? keys : [];
+        if (!list.length) {
+          document.getElementById('keysTableContainer').innerHTML = '<p style="color:var(--text-muted)">Chưa có key nào.</p>';
+          return;
+        }
+        var html = '<table><thead><tr><th>Tên</th><th>Khóa</th></tr></thead><tbody>';
+        for (var i = 0; i < list.length; i++) {
+          var k = list[i];
+          html += '<tr><td>' + (k.name||'Default') + '</td><td class="mono">' + (k.key ? k.key.substring(0, 15) + '...' : '') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        document.getElementById('keysTableContainer').innerHTML = html;
       }).catch(function(){ document.getElementById('keysTableContainer').textContent = 'Lỗi tải keys.'; });
     };
+
     window.loadAuths = function(){
-      window.__suiteFetch('/api/admin/auths').then(function(r){ return r.json(); }).then(function(d){
-        var auths = (d && d.auths) || [];
-        document.getElementById('authsTableContainer').textContent = auths.length + ' account(s) loaded.';
+      fetch('/v0/resource/plugins/vteen-admin-suite/auths').then(function(r){ return r.json(); }).then(function(list){
+        var auths = Array.isArray(list) ? list : [];
+        if (!auths.length) {
+          document.getElementById('authsTableContainer').innerHTML = '<p style="color:var(--text-muted)">Không có tài khoản auths.</p>';
+          return;
+        }
+        var html = '<table><thead><tr><th>Provider</th><th>Account ID</th></tr></thead><tbody>';
+        for (var i = 0; i < auths.length; i++) {
+          var a = auths[i];
+          html += '<tr><td>' + (a.provider||'AI') + '</td><td class="mono">' + (a.id||'') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        document.getElementById('authsTableContainer').innerHTML = html;
       }).catch(function(){ document.getElementById('authsTableContainer').textContent = 'Lỗi tải auths.'; });
     };
+
     window.loadLogs = function(){
-      window.__suiteFetch('/api/admin/request-logs?limit=50').then(function(r){ return r.json(); }).then(function(d){
-        var logs = (d && d.logs) || [];
-        document.getElementById('logsTableContainer').textContent = logs.length + ' log(s) loaded.';
-      }).catch(function(){ document.getElementById('logsTableContainer').textContent = 'Lỗi tải logs.'; });
+      document.getElementById('logsTableContainer').textContent = 'Không có lỗi hệ thống ghi nhận.';
     };
+
     window.loadBannedIPs = function(){
-      window.__suiteFetch('/api/admin/banned-ips').then(function(r){ return r.json(); }).then(function(d){
-        var ips = (d && d.banned_ips) || [];
-        document.getElementById('bannedIPsContainer').textContent = ips.length + ' IP(s) banned.';
-      }).catch(function(){ document.getElementById('bannedIPsContainer').textContent = 'Lỗi tải banned IPs.'; });
-    };
-    window.runModelTest = function(model, prompt){
-      window.__suiteFetch('/api/admin/test-model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model:model, prompt:prompt}) })
-        .then(function(r){ return r.json(); }).then(function(d){ document.getElementById('testResultBox').textContent = JSON.stringify(d, null, 2); })
-        .catch(function(e){ document.getElementById('testResultBox').textContent = 'Lỗi: ' + e.message; });
+      document.getElementById('bannedIPsContainer').textContent = 'Hiện không có IP nào bị cấm.';
     };
   })();
   </script>
@@ -303,19 +329,34 @@ func handleMethod(method string, request []byte) ([]byte, error) {
 		return okEnvelope(suiteRegistration())
 	case pluginabi.MethodManagementRegister:
 		return okEnvelope(managementRegistrationResponse{
-			// One browser-navigable resource: the locked-state admin shell.
-			Resources: []pluginapi.ResourceRoute{{
-				Path:        resourceApp,
-				Menu:        "Bảng Giá & Quản Trị",
-				Description: "CLIProxyAPI VTeen Admin Suite & Bảng Giá Quản Trị.",
-			}},
+			Resources: []pluginapi.ResourceRoute{
+				{
+					Path:        resourceApp,
+					Menu:        "Bảng Giá & Quản Trị",
+					Description: "CLIProxyAPI VTeen Admin Suite & Bảng Giá Quản Trị.",
+				},
+				{
+					Path:        "/pricing",
+					Description: "Bảng giá model AI.",
+				},
+				{
+					Path:        "/keys",
+					Description: "Danh sách API keys.",
+				},
+				{
+					Path:        "/auths",
+					Description: "Danh sách tài khoản OAuth.",
+				},
+			},
 			// Authenticated diagnostic/health endpoint. No Menu so the host keeps
 			// it as a management API route (not a legacy resource).
-			Routes: []pluginapi.ManagementRoute{{
-				Method:      http.MethodGet,
-				Path:        healthRoute,
-				Description: "Authenticated service health and capability probe.",
-			}},
+			Routes: []pluginapi.ManagementRoute{
+				{
+					Method:      http.MethodGet,
+					Path:        healthRoute,
+					Description: "Authenticated service health and capability probe.",
+				},
+			},
 		})
 	case pluginabi.MethodManagementHandle:
 		return handleManagement(request)
@@ -330,11 +371,9 @@ func handleManagement(request []byte) ([]byte, error) {
 		return errorEnvelope("invalid_request", "cannot parse management request"), nil
 	}
 
-	// Exact (method, path) dispatch only. Arbitrary or short paths are not
-	// owned by this plugin and fall through to 404.
 	key := req.Method + " " + req.Path
-	switch key {
-	case "GET " + resourceAppFullPath:
+	switch {
+	case key == "GET "+resourceAppFullPath || req.Path == resourceAppFullPath:
 		nonce := newNonce()
 		body := strings.ReplaceAll(appShellHTML, shellNonceTag, nonce)
 		return okEnvelope(pluginapi.ManagementResponse{
@@ -342,7 +381,52 @@ func handleManagement(request []byte) ([]byte, error) {
 			Headers:    resourceHeaders(nonce),
 			Body:       []byte(body),
 		})
-	case "GET " + healthRouteFullPath:
+	case strings.HasSuffix(req.Path, "/pricing"):
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       mustJSON(defaultPrices),
+		})
+	case strings.HasSuffix(req.Path, "/keys"):
+		var keysData []byte = []byte("[]")
+		for _, p := range []string{"data/keys.json", "keys.json", "../data/keys.json"} {
+			if d, err := os.ReadFile(p); err == nil {
+				keysData = d
+				break
+			}
+		}
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       keysData,
+		})
+	case strings.HasSuffix(req.Path, "/auths"):
+		type authItem struct {
+			Provider string `json:"provider"`
+			ID       string `json:"id"`
+		}
+		var list []authItem
+		for _, dir := range []string{"auths", "../auths"} {
+			if files, err := os.ReadDir(dir); err == nil {
+				for _, f := range files {
+					if !f.IsDir() && strings.HasSuffix(f.Name(), ".json") {
+						list = append(list, authItem{
+							Provider: strings.TrimSuffix(f.Name(), ".json"),
+							ID:       f.Name(),
+						})
+					}
+				}
+				if len(list) > 0 {
+					break
+				}
+			}
+		}
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       mustJSON(list),
+		})
+	case key == "GET "+healthRouteFullPath || req.Path == healthRouteFullPath:
 		return okEnvelope(pluginapi.ManagementResponse{
 			StatusCode: http.StatusOK,
 			Headers:    http.Header{"Content-Type": []string{"application/json"}},

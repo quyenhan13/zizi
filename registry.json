@@ -18,8 +18,8 @@
             "goos": "windows",
             "goarch": "amd64",
             "url": "https://raw.githubusercontent.com/quyenhan13/zizi/main/vteen-admin-suite_1.0.0_windows_amd64.zip",
-            "sha256": "f30d861369500fbcdbdea95429885bd95986cc445c71b9d2d878061276d93910",
-            "size": 1792127
+            "sha256": "5bc88a6a78c98ab8acf4fffdad1836cd92cf987739be6f76862e98bb29f54ba6",
+            "size": 3213967
           }
         ]
       }

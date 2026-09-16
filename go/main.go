@@ -33,6 +33,25 @@ typedef struct {
 extern int cliproxyPluginCall(char*, uint8_t*, size_t, cliproxy_buffer*);
 extern void cliproxyPluginFree(void*, size_t);
 extern void cliproxyPluginShutdown(void);
+
+static const cliproxy_host_api* stored_host;
+
+static void store_host_api(const cliproxy_host_api* host) {
+	stored_host = host;
+}
+
+static int call_host_api(const char* method, const uint8_t* request, size_t request_len, cliproxy_buffer* response) {
+	if (stored_host == NULL || stored_host->call == NULL) {
+		return 1;
+	}
+	return stored_host->call(stored_host->host_ctx, method, request, request_len, response);
+}
+
+static void free_host_buffer(void* ptr, size_t len) {
+	if (stored_host != NULL && stored_host->free_buffer != NULL && ptr != NULL) {
+		stored_host->free_buffer(ptr, len);
+	}
+}
 */
 import "C"
 
@@ -50,14 +69,18 @@ import (
 )
 
 const (
-	pluginName          = "vteen-admin-suite"
-	pluginDisplayName   = "Bảng Giá & Quản Trị (VTeen Suite)"
-	pluginVer           = "1.0.0"
-	resourceApp         = "/app"
-	healthRoute         = "/vteen-admin-suite/health"
-	resourceAppFullPath = "/v0/resource/plugins/vteen-admin-suite/app"
-	healthRouteFullPath = "/v0/management/vteen-admin-suite/health"
-	shellNonceTag       = "__VTEEN_NONCE__"
+	pluginName        = "vteen-admin-suite"
+	pluginDisplayName = "Bảng Giá & Quản Trị (VTeen Suite)"
+	pluginVer         = "1.0.1"
+
+	resourceAppPath         = "/app"
+	resourcePricingPath     = "/pricing"
+	resourceAppFullPath     = "/v0/resource/plugins/vteen-admin-suite/app"
+	resourcePricingFullPath = "/v0/resource/plugins/vteen-admin-suite/pricing"
+	healthRoutePath         = "/vteen-admin-suite/health"
+	healthRouteFullPath     = "/v0/management/vteen-admin-suite/health"
+
+	shellNonceTag = "__VTEEN_NONCE__"
 )
 
 // resourceHeaders builds the strict same-origin framing policy for the plugin
@@ -118,7 +141,7 @@ const appShellHTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bảng Giá & Quản Trị - CLIProxyAPI</title>
+<title>VTeen Admin Suite - CLIProxyAPI</title>
 <style nonce="__VTEEN_NONCE__">
   :root { --bg-main:#0b0f17; --bg-card:#111622; --bg-sidebar:#0e131e; --border-color:rgba(255,255,255,0.08); --primary:#6366f1; --text-primary:#f8fafc; --text-secondary:#94a3b8; --text-muted:#64748b; }
   * { box-sizing:border-box; }
@@ -141,7 +164,24 @@ const appShellHTML = `<!doctype html>
   th, td { padding:10px 14px; border-bottom:1px solid var(--border-color); font-size:13px; }
   th { color:var(--text-muted); font-weight:600; font-size:12px; }
   tr:hover td { background:rgba(255,255,255,0.02); }
-  .mono { font-family:monospace; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .muted { color:var(--text-muted); font-size:12px; }
+  .warn { color:#fbbf24; font-size:13px; }
+  .error { color:#f87171; font-size:13px; white-space:pre-wrap; }
+  .ok { color:#34d399; font-size:13px; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .toolbar input, .toolbar select, .toolbar textarea { background:#0b0f17; border:1px solid var(--border-color); color:var(--text-primary); border-radius:7px; padding:8px 10px; font-size:13px; font-family:inherit; }
+  .toolbar input, .toolbar select { min-width:170px; }
+  .toolbar textarea { width:100%; min-height:70px; }
+  .toolbar button { background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.5); color:#c7d2fe; border-radius:7px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .toolbar button:hover { background:rgba(99,102,241,0.32); }
+  pre { background:#0b0f17; border:1px solid var(--border-color); border-radius:7px; padding:12px; font-size:12px; max-height:420px; overflow:auto; white-space:pre-wrap; word-break:break-word; margin:0; }
+  .pill { display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:600; background:rgba(148,163,184,0.15); color:#cbd5e1; }
+  .pill.ok { background:rgba(16,185,129,0.15); color:#34d399; }
+  .pill.bad { background:rgba(248,113,113,0.15); color:#f87171; }
+  .kv { display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; font-size:13px; margin-bottom:14px; }
+  .kv dt { color:var(--text-muted); }
+  .kv dd { margin:0; }
 </style>
 </head>
 <body>
@@ -151,8 +191,8 @@ const appShellHTML = `<!doctype html>
       <h2>BẢNG GIÁ & QUẢN TRỊ</h2>
     </div>
     <ul class="nav-list">
-      <li><button class="nav-btn active" data-tab="pricing">Bảng Giá Model (VNĐ)</button></li>
-      <li><button class="nav-btn" data-tab="keys">Quản Lý & Tạo API Keys</button></li>
+      <li><button class="nav-btn active" data-tab="pricing">Bảng Giá Model</button></li>
+      <li><button class="nav-btn" data-tab="keys">Quản Lý API Keys</button></li>
       <li><button class="nav-btn" data-tab="auths">Token Từng Tài Khoản (Auths)</button></li>
       <li><button class="nav-btn" data-tab="logs">Nhật Ký & Check Lỗi</button></li>
       <li><button class="nav-btn" data-tab="banned_ips">IP Bị Cấm (Banned IPs)</button></li>
@@ -161,38 +201,193 @@ const appShellHTML = `<!doctype html>
   </div>
   <div id="mainContent">
     <div class="content-header">
-      <h1 id="activeTabTitle">Bảng Giá Model (VNĐ)</h1>
-      <div><span class="badge">VTeen Suite Active</span></div>
+      <h1 id="activeTabTitle">Bảng Giá Model</h1>
+      <div><span class="badge" id="suiteVersionBadge">VTeen Suite</span></div>
     </div>
     <div class="content-body">
-      <div id="pane-pricing" class="tab-pane card"><h3>Bảng Giá Model (Đơn vị: VNĐ / 1k tokens)</h3><div id="pricingTableContainer">Đang tải bảng giá...</div></div>
-      <div id="pane-keys" class="tab-pane card" style="display:none;"><h3>API Keys</h3><div id="keysTableContainer">Đang tải...</div></div>
-      <div id="pane-auths" class="tab-pane card" style="display:none;"><h3>Auth Accounts</h3><div id="authsTableContainer">Đang tải...</div></div>
-      <div id="pane-logs" class="tab-pane card" style="display:none;"><h3>Logs</h3><div id="logsTableContainer">Đang tải...</div></div>
-      <div id="pane-banned_ips" class="tab-pane card" style="display:none;"><h3>Banned IPs</h3><div id="bannedIPsContainer">Đang tải...</div></div>
-      <div id="pane-test" class="tab-pane card" style="display:none;"><h3>Test Model</h3><div id="testResultBox">Chưa có kết quả.</div></div>
+      <div class="card" style="padding:14px 20px;">
+        <div class="toolbar">
+          <span class="muted" style="font-weight:600;color:#cbd5e1;">Management Key</span>
+          <input id="mgmtKey" type="password" placeholder="dán management key của CLIProxyAPI" autocomplete="off" spellcheck="false">
+          <button id="keySave" type="button">Lưu key</button>
+          <button id="keyClear" type="button">Xoá</button>
+          <span id="keyState" class="muted"></span>
+        </div>
+        <p class="muted" style="margin:10px 0 0 0;">Key chỉ được giữ trong <span class="mono">sessionStorage</span> của tab này và gửi qua header <span class="mono">X-Management-Key</span> tới các API <span class="mono">/v0/management/*</span>. Không truyền qua URL. Tab Bảng Giá và Kiểm Tra Model không cần key.</p>
+      </div>
+
+      <div id="pane-pricing" class="tab-pane card">
+        <h3>Bảng Giá Model (USD / 1M tokens)</h3>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <span class="muted">Quy đổi VNĐ:</span>
+          <input id="usdVnd" type="number" min="0" step="50" placeholder="tỷ giá VNĐ/USD (tuỳ chọn)">
+          <button id="rateApply" type="button">Quy đổi</button>
+          <span id="pricingMeta" class="muted"></span>
+        </div>
+        <div id="pricingTableContainer">Đang tải bảng giá...</div>
+        <p class="muted" style="margin-top:12px;">Đơn giá gốc theo USD/1M token. Cột VNĐ chỉ xuất hiện khi bạn nhập tỷ giá; plugin không lưu tỷ giá.</p>
+      </div>
+
+      <div id="pane-keys" class="tab-pane card" style="display:none;">
+        <h3>Quản Lý API Keys <span class="muted">GET /v0/management/api-keys</span></h3>
+        <div class="toolbar" style="margin-bottom:14px;"><button id="keysRefresh" type="button">Tải lại</button><span id="keysMeta" class="muted"></span></div>
+        <div id="keysTableContainer">Chưa tải.</div>
+      </div>
+
+      <div id="pane-auths" class="tab-pane card" style="display:none;">
+        <h3>Token Từng Tài Khoản (Auths) <span class="muted">GET /v0/management/auth-files</span></h3>
+        <div class="toolbar" style="margin-bottom:14px;"><button id="authsRefresh" type="button">Tải lại</button><span id="authsMeta" class="muted"></span></div>
+        <div id="authsTableContainer">Chưa tải.</div>
+      </div>
+
+      <div id="pane-logs" class="tab-pane card" style="display:none;">
+        <h3>Nhật Ký & Check Lỗi <span class="muted">GET /v0/management/logs</span></h3>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <span class="muted">Số dòng:</span>
+          <input id="logsLimit" type="number" min="1" max="2000" step="50" value="200">
+          <button id="logsRefresh" type="button">Tải lại</button>
+          <span id="logsMeta" class="muted"></span>
+        </div>
+        <div id="logsTableContainer">Chưa tải.</div>
+      </div>
+
+      <div id="pane-banned_ips" class="tab-pane card" style="display:none;">
+        <h3>IP Bị Cấm (Banned IPs)</h3>
+        <div id="bannedIPsContainer"></div>
+      </div>
+
+      <div id="pane-test" class="tab-pane card" style="display:none;">
+        <h3>Kiểm Tra Model (Test) <span class="muted">plugin → host.model.execute</span></h3>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <input id="testModel" placeholder="model, ví dụ: gpt-5.5" value="gpt-5.5">
+          <select id="testEntry">
+            <option value="openai">openai</option>
+            <option value="openai-response">openai-response</option>
+            <option value="claude">claude</option>
+            <option value="gemini">gemini</option>
+            <option value="codex">codex</option>
+            <option value="antigravity">antigravity</option>
+            <option value="interactions">interactions</option>
+          </select>
+          <select id="testExit">
+            <option value="openai">openai</option>
+            <option value="openai-response">openai-response</option>
+            <option value="claude">claude</option>
+            <option value="gemini">gemini</option>
+            <option value="codex">codex</option>
+            <option value="antigravity">antigravity</option>
+            <option value="interactions">interactions</option>
+          </select>
+          <span class="muted">entry → exit</span>
+        </div>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <textarea id="testPrompt" spellcheck="false">Xin chào, trả lời ngắn gọn: 2+2 bằng mấy?</textarea>
+        </div>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <button id="testRun" type="button">Gửi request</button>
+          <span id="testMeta" class="muted"></span>
+        </div>
+        <div id="testResultBox" class="muted">Chưa có kết quả.</div>
+      </div>
     </div>
   </div>
   <script nonce="__VTEEN_NONCE__">
   (function(){
+    var MGMT = '/v0/management';
+    var PLUGIN = MGMT + '/vteen-admin-suite';
+    var RESOURCE = '/v0/resource/plugins/vteen-admin-suite';
+    var KEY_STORAGE = 'vteen-admin-suite-key';
+    var usdVndRate = 0;
+
     var navButtons = document.querySelectorAll('#suiteSidebar .nav-btn');
     var tabPanes = document.querySelectorAll('.content-body .tab-pane');
     var activeTitle = document.getElementById('activeTabTitle');
+
+    function esc(v){
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+        return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
+      });
+    }
+    function setBox(id, html){ var el = document.getElementById(id); if (el) { el.innerHTML = html; } }
+    function setText(id, text){ var el = document.getElementById(id); if (el) { el.textContent = text; } }
+
+    function getKey(){
+      try { return sessionStorage.getItem(KEY_STORAGE) || ''; } catch (e) { return ''; }
+    }
+    function setKey(value){
+      try {
+        if (value) { sessionStorage.setItem(KEY_STORAGE, value); } else { sessionStorage.removeItem(KEY_STORAGE); }
+      } catch (e) {}
+    }
+    function renderKeyState(){
+      var el = document.getElementById('keyState');
+      if (!el) { return; }
+      el.textContent = getKey() ? 'đã có key trong tab này' : 'chưa có key — tab API Keys / Auths / Nhật Ký sẽ trả 401';
+    }
+
+    // suiteFetch gọi Management API của host. Key phải nằm trong header
+    // X-Management-Key: CLIProxyAPI không chấp nhận cookie cho /v0/management/*
+    // và sẽ khoá IP sau 5 lần sai key, nên không được gửi request thiếu key.
+    function suiteFetch(path, opts){
+      opts = opts || {};
+      var headers = opts.headers || {};
+      var key = getKey();
+      if (key) { headers['X-Management-Key'] = key; }
+      opts.headers = headers;
+      return fetch(path, opts).then(function(res){
+        return res.text().then(function(text){
+          var data = null;
+          if (text) { try { data = JSON.parse(text); } catch (e) { data = null; } }
+          if (!res.ok) {
+            var msg = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+            if (res.status === 401) { msg = '401 — thiếu hoặc sai Management Key. Nhập key ở thanh trên rồi thử lại.'; }
+            if (res.status === 403) { msg = '403 — ' + msg + ' (kiểm tra allow-remote-management; sai key 5 lần sẽ bị tạm cấm 30 phút).'; }
+            var err = new Error(msg);
+            err.status = res.status;
+            throw err;
+          }
+          return data;
+        });
+      });
+    }
+    function fail(id, err){
+      setBox(id, '<p class="error">' + esc(err && err.message ? err.message : String(err)) + '</p>');
+    }
+    function tableOf(columns, rows){
+      if (!rows || !rows.length) { return '<p class="muted">Không có dữ liệu.</p>'; }
+      var html = '<table><thead><tr>';
+      for (var c = 0; c < columns.length; c++) { html += '<th>' + esc(columns[c].title) + '</th>'; }
+      html += '</tr></thead><tbody>';
+      for (var r = 0; r < rows.length; r++) {
+        html += '<tr>';
+        for (var c2 = 0; c2 < columns.length; c2++) {
+          html += '<td' + (columns[c2].mono ? ' class="mono"' : '') + '>' + esc(columns[c2].value(rows[r])) + '</td>';
+        }
+        html += '</tr>';
+      }
+      return html + '</tbody></table>';
+    }
+    function num(v, digits){
+      var n = Number(v);
+      if (!isFinite(n)) { return '0'; }
+      return n.toFixed(digits == null ? 4 : digits);
+    }
+
     function switchTab(tab){
-      if (!tab) tab = 'pricing';
+      if (!tab) { tab = 'pricing'; }
       var matched = null;
       navButtons.forEach(function(b){
         var m = b.getAttribute('data-tab') === tab;
         b.classList.toggle('active', m);
-        if (m) matched = b;
+        if (m) { matched = b; }
       });
       tabPanes.forEach(function(p){ p.style.display = (p.id === 'pane-' + tab) ? 'block' : 'none'; });
-      if (matched) activeTitle.textContent = matched.textContent.trim();
-      if (tab === 'pricing') loadPricing();
-      if (tab === 'keys') loadKeys();
-      if (tab === 'auths') loadAuths();
-      if (tab === 'logs') loadLogs();
-      if (tab === 'banned_ips') loadBannedIPs();
+      if (matched) { activeTitle.textContent = matched.textContent.trim(); }
+      if (tab === 'pricing') { loadPricing(); }
+      if (tab === 'keys') { loadKeys(); }
+      if (tab === 'auths') { loadAuths(); }
+      if (tab === 'logs') { loadLogs(); }
+      if (tab === 'banned_ips') { loadBannedIPs(); }
     }
     navButtons.forEach(function(b){
       b.addEventListener('click', function(e){
@@ -205,36 +400,43 @@ const appShellHTML = `<!doctype html>
     var initialTab = (RegExp('[?&]tab=([^&]*)').exec(window.location.search) || [,'pricing'])[1] || 'pricing';
     switchTab(initialTab);
 
-    window.loadPricing = function(){
-      fetch('/v0/resource/plugins/vteen-admin-suite/pricing').then(function(r){ return r.json(); }).then(function(models){
-        var html = '<table><thead><tr><th>Tên Model</th><th>Input ($ / 1M)</th><th>Output ($ / 1M)</th><th>Cache Read</th><th>Cache Write</th></tr></thead><tbody>';
+    function loadPricing(){
+      fetch(RESOURCE + '/pricing').then(function(r){
+        if (!r.ok) { throw new Error('HTTP ' + r.status); }
+        return r.json();
+      }).then(function(models){
+        models = models || {};
         var keys = Object.keys(models).sort();
-        for (var i = 0; i < keys.length; i++){
-          var k = keys[i];
-          var it = models[k] || {};
-          html += '<tr><td class="mono" style="font-weight:600;">' + k + '</td><td class="mono">$' + (it.input_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.output_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.cache_read_price_per_million||0).toFixed(4) + '</td><td class="mono">$' + (it.cache_creation_price_per_million||0).toFixed(4) + '</td></tr>';
+        var vnd = usdVndRate > 0;
+        var columns = [
+          { title: 'Model', mono: true, value: function(m){ return m; } },
+          { title: 'Input (USD / 1M)', mono: true, value: function(m){ return num(models[m].input_price_per_million); } },
+          { title: 'Output (USD / 1M)', mono: true, value: function(m){ return num(models[m].output_price_per_million); } },
+          { title: 'Cache read (USD / 1M)', mono: true, value: function(m){ return num(models[m].cache_read_price_per_million); } },
+          { title: 'Cache write (USD / 1M)', mono: true, value: function(m){ return num(models[m].cache_creation_price_per_million); } }
+        ];
+        if (vnd) {
+          columns.push({ title: 'Input (VNĐ / 1M)', mono: true, value: function(m){ return num(models[m].input_price_per_million * usdVndRate, 0); } });
+          columns.push({ title: 'Output (VNĐ / 1M)', mono: true, value: function(m){ return num(models[m].output_price_per_million * usdVndRate, 0); } });
         }
-        html += '</tbody></table>';
-        document.getElementById('pricingTableContainer').innerHTML = html;
-      }).catch(function(e){ document.getElementById('pricingTableContainer').textContent = 'Lỗi tải bảng giá: ' + e.message; });
-    };
+        setBox('pricingTableContainer', tableOf(columns, keys));
+        setText('pricingMeta', keys.length + ' model' + (vnd ? ' • tỷ giá ' + usdVndRate + ' VNĐ/USD' : ''));
+      }).catch(function(err){ fail('pricingTableContainer', err); });
+    }
 
-    window.loadKeys = function(){
-      fetch('/v0/resource/plugins/vteen-admin-suite/keys').then(function(r){ return r.json(); }).then(function(keys){
-        var list = Array.isArray(keys) ? keys : [];
-        if (!list.length) {
-          document.getElementById('keysTableContainer').innerHTML = '<p style="color:var(--text-muted)">Chưa có key nào.</p>';
-          return;
-        }
-        var html = '<table><thead><tr><th>Tên</th><th>Khóa</th></tr></thead><tbody>';
-        for (var i = 0; i < list.length; i++) {
-          var k = list[i];
-          html += '<tr><td>' + (k.name||'Default') + '</td><td class="mono">' + (k.key ? k.key.substring(0, 15) + '...' : '') + '</td></tr>';
-        }
-        html += '</tbody></table>';
-        document.getElementById('keysTableContainer').innerHTML = html;
-      }).catch(function(){ document.getElementById('keysTableContainer').textContent = 'Lỗi tải keys.'; });
-    };
+    function loadKeys(){
+      setBox('keysTableContainer', '<p class="muted">Đang tải...</p>');
+      suiteFetch(MGMT + '/api-keys').then(function(data){
+        var keys = (data && data['api-keys']) || [];
+        var rows = keys.map(function(k, i){ return { index: i + 1, key: String(k) }; });
+        setBox('keysTableContainer', tableOf([
+          { title: '#', value: function(r){ return r.index; } },
+          { title: 'API Key (rút gọn)', mono: true, value: function(r){ return r.key.length > 12 ? r.key.slice(0, 8) + '...' + r.key.slice(-4) : r.key; } },
+          { title: 'Độ dài', value: function(r){ return r.key.length; } }
+        ], rows));
+        setText('keysMeta', keys.length + ' key');
+      }).catch(function(err){ fail('keysTableContainer', err); setText('keysMeta', ''); });
+    }
 
     window.loadAuths = function(){
       fetch('/v0/resource/plugins/vteen-admin-suite/auths').then(function(r){ return r.json(); }).then(function(list){
@@ -331,7 +533,7 @@ func handleMethod(method string, request []byte) ([]byte, error) {
 		return okEnvelope(managementRegistrationResponse{
 			Resources: []pluginapi.ResourceRoute{
 				{
-					Path:        resourceApp,
+					Path:        resourceAppPath,
 					Menu:        "Bảng Giá & Quản Trị",
 					Description: "CLIProxyAPI VTeen Admin Suite & Bảng Giá Quản Trị.",
 				},
@@ -353,7 +555,7 @@ func handleMethod(method string, request []byte) ([]byte, error) {
 			Routes: []pluginapi.ManagementRoute{
 				{
 					Method:      http.MethodGet,
-					Path:        healthRoute,
+					Path:        healthRoutePath,
 					Description: "Authenticated service health and capability probe.",
 				},
 			},

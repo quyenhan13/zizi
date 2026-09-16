@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "plugins": [
+    {
+      "id": "vteen-admin-suite",
+      "name": "Bảng Giá & Quản Trị (VTeen Suite)",
+      "description": "Bộ công cụ mở rộng quản trị bảng giá, API keys, Kiro AWS OAuth, và Auto Event.",
+      "author": "quyenhan13",
+      "version": "1.0.0",
+      "repository": "https://github.com/quyenhan13/zizi",
+      "homepage": "https://github.com/quyenhan13/zizi",
+      "license": "MIT",
+      "tags": ["management", "billing", "vteen"],
+      "install": {
+        "type": "direct",
+        "artifacts": [
+          {
+            "goos": "windows",
+            "goarch": "amd64",
+            "url": "https://raw.githubusercontent.com/quyenhan13/zizi/main/vteen-admin-suite_1.0.0_windows_amd64.zip",
+            "sha256": "17f0f2eb748b12cd3fde67a6cde43e268ef03dd6597ad02c76b7435e5d088e03",
+            "size": 1791984
+          }
+        ]
+      }
+    }
+  ]
+}

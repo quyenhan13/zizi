@@ -69,11 +69,11 @@ func resourceHeaders(nonce string) http.Header {
 		"form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; " +
 		"script-src 'self' 'nonce-" + nonce + "'; style-src 'self' 'nonce-" + nonce + "'"
 	return http.Header{
-		"Content-Type":           []string{"text/html; charset=utf-8"},
-		"Cache-Control":          []string{"no-store"},
-		"Referrer-Policy":        []string{"no-referrer"},
-		"X-Content-Type-Options": []string{"nosniff"},
-		"X-Frame-Options":        []string{"SAMEORIGIN"},
+		"Content-Type":            []string{"text/html; charset=utf-8"},
+		"Cache-Control":           []string{"no-store"},
+		"Referrer-Policy":         []string{"no-referrer"},
+		"X-Content-Type-Options":  []string{"nosniff"},
+		"X-Frame-Options":         []string{"SAMEORIGIN"},
 		"Content-Security-Policy": []string{csp},
 	}
 }
@@ -93,197 +93,23 @@ const appShellHTML = `<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bảng Giá & Quản Trị - CLIProxyAPI</title>
 <style nonce="__VTEEN_NONCE__">
-  :root {
-    --bg-main: #0b0f17;
-    --bg-card: #111622;
-    --bg-sidebar: #0e131e;
-    --bg-input: #171e2e;
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(255, 255, 255, 0.16);
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-light: rgba(99, 102, 241, 0.15);
-    --success: #10b981;
-    --success-light: rgba(16, 185, 129, 0.15);
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --danger-light: rgba(239, 68, 68, 0.15);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-main);
-    color: var(--text-primary);
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-  #suiteSidebar {
-    width: 250px;
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-  }
-  .sidebar-header {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .sidebar-header h2 {
-    font-size: 13px;
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: 0.05em;
-    color: #cbd5e1;
-    text-transform: uppercase;
-  }
-  .nav-list {
-    list-style: none;
-    padding: 10px 8px;
-    margin: 0;
-    overflow-y: auto;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .nav-btn {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    border-radius: 7px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s ease;
-  }
-  .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: #f1f5f9;
-  }
-  .nav-btn.active {
-    background: rgba(99, 102, 241, 0.15);
-    color: #818cf8;
-    font-weight: 600;
-  }
-  .nav-btn svg { flex-shrink: 0; }
-  #mainContent {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .content-header {
-    padding: 14px 24px;
-    border-bottom: 1px solid var(--border-color);
-    background: rgba(17, 22, 34, 0.6);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .content-header h1 {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .content-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-  }
-  .tab-pane { display: none; }
-  .tab-pane.active { display: block; }
-  .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .card h3 {
-    margin: 0 0 12px 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: #f1f5f9;
-  }
-  .btn {
-    padding: 8px 16px;
-    border-radius: 7px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .btn-primary { background: var(--primary); color: #fff; }
-  .btn-primary:hover { background: var(--primary-hover); }
-  .btn-danger { background: var(--danger-light); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-  .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
-  .btn-secondary { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; border: 1px solid var(--border-color); }
-  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  th, td {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border-color);
-    text-align: left;
-  }
-  th { color: var(--text-muted); font-weight: 600; font-size: 12px; }
-  tr:hover td { background: rgba(255, 255, 255, 0.02); }
-  .badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .badge-success { background: var(--success-light); color: #34d399; }
-  .badge-danger { background: var(--danger-light); color: #f87171; }
-  input, select, textarea {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: #f1f5f9;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    outline: none;
-    width: 100%;
-  }
-  input:focus, select:focus, textarea:focus {
-    border-color: var(--primary);
-  }
-  .form-group {
-    margin-bottom: 14px;
-  }
-  .form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
+  :root { --bg-main:#0b0f17; --bg-card:#111622; --bg-sidebar:#0e131e; --border-color:rgba(255,255,255,0.08); --primary:#6366f1; --text-primary:#f8fafc; --text-secondary:#94a3b8; --text-muted:#64748b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg-main); color:var(--text-primary); display:flex; height:100vh; overflow:hidden; }
+  #suiteSidebar { width:250px; background:var(--bg-sidebar); border-right:1px solid var(--border-color); display:flex; flex-direction:column; flex-shrink:0; }
+  .sidebar-header { padding:16px 18px; border-bottom:1px solid var(--border-color); display:flex; align-items:center; gap:10px; }
+  .sidebar-header h2 { font-size:13px; font-weight:700; margin:0; letter-spacing:0.05em; color:#cbd5e1; text-transform:uppercase; }
+  .nav-list { list-style:none; padding:10px 8px; margin:0; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:3px; }
+  .nav-btn { width:100%; display:flex; align-items:center; gap:10px; padding:9px 12px; background:transparent; border:none; color:#94a3b8; border-radius:7px; font-size:13px; font-weight:500; cursor:pointer; text-align:left; }
+  .nav-btn:hover { background:rgba(255,255,255,0.04); color:#f1f5f9; }
+  .nav-btn.active { background:rgba(99,102,241,0.15); color:#818cf8; font-weight:600; }
+  #mainContent { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .content-header { padding:14px 24px; border-bottom:1px solid var(--border-color); background:rgba(17,22,34,0.6); display:flex; justify-content:space-between; align-items:center; }
+  .content-header h1 { font-size:16px; font-weight:600; margin:0; }
+  .content-body { flex:1; overflow-y:auto; padding:24px; }
+  .card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:10px; padding:20px; margin-bottom:20px; }
+  .card h3 { margin:0 0 12px 0; font-size:14px; font-weight:600; color:#f1f5f9; }
+  .badge { display:inline-block; padding:3px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:rgba(16,185,129,0.15); color:#34d399; }
 </style>
 </head>
 <body>
@@ -293,111 +119,278 @@ const appShellHTML = `<!doctype html>
       <h2>BẢNG GIÁ & QUẢN TRỊ</h2>
     </div>
     <ul class="nav-list">
-      <li><button class="nav-btn active" data-tab="pricing"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> Bảng Giá Model (VNĐ)</button></li>
-      <li><button class="nav-btn" data-tab="keys"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1-1l-3 3m-1-1l-3 3M3 21l9-9m3-3a5 5 0 10-7-7 5 5 0 007 7z"/></svg> Quản Lý & Tạo API Keys</button></li>
-      <li><button class="nav-btn" data-tab="auths"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Token Từng Tài Khoản (Auths)</button></li>
-      <li><button class="nav-btn" data-tab="kiro_oauth"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Đăng Nhập Kiro (AWS)</button></li>
-      <li><button class="nav-btn" data-tab="logs"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> Nhật Ký & Check Lỗi</button></li>
-      <li><button class="nav-btn" data-tab="telebot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Bot Telegram & SePay</button></li>
-      <li><button class="nav-btn" data-tab="autoevent"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Auto Event Telegram</button></li>
-      <li><button class="nav-btn" data-tab="aibot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> AI Chat Bot</button></li>
-      <li><button class="nav-btn" data-tab="banned_ips"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> IP Bị Cấm (Banned IPs)</button></li>
-      <li><button class="nav-btn" data-tab="password"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Đổi Mật Khẩu Admin</button></li>
-      <li><button class="nav-btn" data-tab="test"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2v7.31M14 9.3V1.99M8.5 2h7M14 9.3a6.5 6.5 0 1 1-4 0"/></svg> Kiểm Tra Model (Test)</button></li>
+      <li><button class="nav-btn active" data-tab="pricing">Bảng Giá Model (VNĐ)</button></li>
+      <li><button class="nav-btn" data-tab="keys">Quản Lý & Tạo API Keys</button></li>
+      <li><button class="nav-btn" data-tab="auths">Token Từng Tài Khoản (Auths)</button></li>
+      <li><button class="nav-btn" data-tab="logs">Nhật Ký & Check Lỗi</button></li>
+      <li><button class="nav-btn" data-tab="banned_ips">IP Bị Cấm (Banned IPs)</button></li>
+      <li><button class="nav-btn" data-tab="test">Kiểm Tra Model (Test)</button></li>
     </ul>
   </div>
-
   <div id="mainContent">
     <div class="content-header">
       <h1 id="activeTabTitle">Bảng Giá Model (VNĐ)</h1>
-      <div>
-        <span class="badge badge-success">VTeen Suite Active</span>
-      </div>
+      <div><span class="badge">VTeen Suite Active</span></div>
     </div>
-
     <div class="content-body">
-      <div id="pane-pricing" class="tab-pane active">
-        <div class="card">
-          <h3>Bảng Giá Model Chi Tiết (Đơn vị: VNĐ / 1k Tokens)</h3>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
-            Cấu hình đơn giá token đầu vào, đầu ra cho từng model. Giá này được hệ thống sử dụng tự động để tính toán chi phí và trừ số dư theo thời gian thực.
-          </p>
-          <div id="pricingTableContainer">Đang tải bảng giá...</div>
-        </div>
-      </div>
+      <div id="pane-pricing" class="tab-pane card"><h3>Bảng Giá Model (VNĐ / 1k tokens)</h3><div id="pricingTableContainer">Đang tải bảng giá...</div></div>
+      <div id="pane-keys" class="tab-pane card" style="display:none;"><h3>API Keys</h3><div id="keysTableContainer">Đang tải...</div></div>
+      <div id="pane-auths" class="tab-pane card" style="display:none;"><h3>Auths</h3><div id="authsTableContainer">Đang tải...</div></div>
+      <div id="pane-logs" class="tab-pane card" style="display:none;"><h3>Logs</h3><div id="logsTableContainer">Đang tải...</div></div>
+      <div id="pane-banned_ips" class="tab-pane card" style="display:none;"><h3>Banned IPs</h3><div id="bannedIPsContainer">Đang tải...</div></div>
+      <div id="pane-test" class="tab-pane card" style="display:none;"><h3>Test Model</h3><div id="testResultBox">Chưa có kết quả.</div></div>
+    </div>
+  </div>
+  <script nonce="__VTEEN_NONCE__">
+  (function(){
+    // CSRF bootstrap: same-origin GET health probe returns the management CSRF
+    // token in a response header. Read into memory only; never persist/transmit
+    // outside same-origin fetch. GET itself needs no token.
+    window.__suiteCsrf = null;
+    window.__suiteAuthHeaders = function(extra){
+      var h = extra || {};
+      if (window.__suiteCsrf) h['X-CPA-CSRF-Token'] = window.__suiteCsrf;
+      return h;
+    };
+    window.__suiteFetch = function(url, opts){
+      opts = opts || {};
+      opts.credentials = 'include';
+      opts.headers = window.__suiteAuthHeaders(opts.headers || {});
+      return fetch(url, opts);
+    };
+    fetch('/v0/management/vteen-admin-suite/health', { credentials: 'include' })
+      .then(function(r){
+        var t = r.headers.get('X-CPA-CSRF-Token');
+        if (t) window.__suiteCsrf = t;
+        return r.json().catch(function(){});
+      })
+      .catch(function(){});
 
-      <div id="pane-keys" class="tab-pane">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <h3 style="margin:0;">Danh Sách API Keys Khách Hàng</h3>
-            <button class="btn btn-primary" onclick="showCreateKeyModal()">+ Tạo Khóa Mới</button>
-          </div>
-          <div id="keysTableContainer">Đang tải danh sách khóa...</div>
-        </div>
-      </div>
+    var navButtons = document.querySelectorAll('#suiteSidebar .nav-btn');
+    var tabPanes = document.querySelectorAll('.content-body .tab-pane');
+    var activeTitle = document.getElementById('activeTabTitle');
+    function switchTab(tab){
+      if (!tab) tab = 'pricing';
+      var matched = null;
+      navButtons.forEach(function(b){
+        var m = b.getAttribute('data-tab') === tab;
+        b.classList.toggle('active', m);
+        if (m) matched = b;
+      });
+      tabPanes.forEach(function(p){ p.style.display = (p.id === 'pane-' + tab) ? 'block' : 'none'; });
+      if (matched) activeTitle.textContent = matched.textContent.trim();
+      if (tab === 'pricing') loadPricing();
+      if (tab === 'keys') loadKeys();
+      if (tab === 'auths') loadAuths();
+      if (tab === 'logs') loadLogs();
+      if (tab === 'banned_ips') loadBannedIPs();
+    }
+    navButtons.forEach(function(b){
+      b.addEventListener('click', function(e){
+        e.preventDefault();
+        var tab = b.getAttribute('data-tab');
+        history.replaceState(null, '', '?tab=' + tab);
+        switchTab(tab);
+      });
+    });
+    var initialTab = (RegExp('[?&]tab=([^&]*)').exec(window.location.search) || [,'pricing'])[1] || 'pricing';
+    switchTab(initialTab);
 
-      <div id="pane-auths" class="tab-pane">
-        <div class="card">
-          <h3>Thống Kê Token Theo Từng Tài Khoản (Auth Pool)</h3>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
-            Giám sát mức tiêu thụ token trên từng tài khoản upstream (Claude, Gemini, OpenAI, Kiro).
-          </p>
-          <div id="authsTableContainer">Đang tải dữ liệu tài khoản...</div>
-        </div>
-      </div>
+    window.loadPricing = function(){
+      window.__suiteFetch('/api/pricing').then(function(r){ return r.json(); }).then(function(d){
+        var models = (d && d.models) || d || {};
+        var html = '<table><thead><tr><th>Model</th><th>Input (VNĐ/1k)</th><th>Output (VNĐ/1k)</th></tr></thead><tbody>';
+        for (var m in models){ var it = models[m] || {}; html += '<tr><td>'+m+'</td><td>'+(it.input_price||0)+'</td><td>'+(it.output_price||0)+'</td></tr>'; }
+        html += '</tbody></table>';
+        document.getElementById('pricingTableContainer').innerHTML = html;
+      }).catch(function(){ document.getElementById('pricingTableContainer').textContent = 'Không thể tải bảng giá.'; });
+    };
+    window.loadKeys = function(){
+      window.__suiteFetch('/api/admin/keys').then(function(r){ return r.json(); }).then(function(d){
+        var keys = (d && d.keys) || [];
+        document.getElementById('keysTableContainer').textContent = keys.length + ' key(s) loaded.';
+      }).catch(function(){ document.getElementById('keysTableContainer').textContent = 'Lỗi tải keys.'; });
+    };
+    window.loadAuths = function(){
+      window.__suiteFetch('/api/admin/auths').then(function(r){ return r.json(); }).then(function(d){
+        var auths = (d && d.auths) || [];
+        document.getElementById('authsTableContainer').textContent = auths.length + ' account(s) loaded.';
+      }).catch(function(){ document.getElementById('authsTableContainer').textContent = 'Lỗi tải auths.'; });
+    };
+    window.loadLogs = function(){
+      window.__suiteFetch('/api/admin/request-logs?limit=50').then(function(r){ return r.json(); }).then(function(d){
+        var logs = (d && d.logs) || [];
+        document.getElementById('logsTableContainer').textContent = logs.length + ' log(s) loaded.';
+      }).catch(function(){ document.getElementById('logsTableContainer').textContent = 'Lỗi tải logs.'; });
+    };
+    window.loadBannedIPs = function(){
+      window.__suiteFetch('/api/admin/banned-ips').then(function(r){ return r.json(); }).then(function(d){
+        var ips = (d && d.banned_ips) || [];
+        document.getElementById('bannedIPsContainer').textContent = ips.length + ' IP(s) banned.';
+      }).catch(function(){ document.getElementById('bannedIPsContainer').textContent = 'Lỗi tải banned IPs.'; });
+    };
+    window.runModelTest = function(model, prompt){
+      window.__suiteFetch('/api/admin/test-model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model:model, prompt:prompt}) })
+        .then(function(r){ return r.json(); }).then(function(d){ document.getElementById('testResultBox').textContent = JSON.stringify(d, null, 2); })
+        .catch(function(e){ document.getElementById('testResultBox').textContent = 'Lỗi: ' + e.message; });
+    };
+  })();
+  </script>
+</body>
+</html>`
 
-      <div id="pane-kiro_oauth" class="tab-pane">
-        <div class="card">
-          <h3>Xác Thực Đăng Nhập Kiro (AWS SSO)</h3>
-          <p style="color:var(--text-secondary);font-size:13px;">
-            Tạo phiên đăng nhập AWS Builder ID / SSO để cấp phát token Kiro tự động vào pool.
-          </p>
-          <div style="margin-top:16px;">
-            <button class="btn btn-primary" onclick="startKiroAuth()">Bắt Đầu Xác Thực AWS SSO</button>
-          </div>
-          <div id="kiroAuthResult" style="margin-top:16px;display:none;"></div>
-        </div>
-      </div>
+type envelope struct {
+	OK     bool            `json:"ok"`
+	Result json.RawMessage `json:"result,omitempty"`
+	Error  string          `json:"error,omitempty"`
+}
 
-      <div id="pane-logs" class="tab-pane">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h3 style="margin:0;">Nhật Ký Request & Check Lỗi Model Real-time</h3>
-            <div>
-              <button class="btn btn-secondary" onclick="refreshLogs()">Làm Mới</button>
-              <button class="btn btn-danger" onclick="clearLogs()">Xóa Logs</button>
-            </div>
-          </div>
-          <div id="logsTableContainer" style="max-height:600px;overflow-y:auto;">Đang kết nối luồng logs...</div>
-        </div>
-      </div>
+type registration struct {
+	ManagementAPI bool `json:"management_api"`
+}
 
-      <div id="pane-telebot" class="tab-pane">
-        <div class="card">
-          <h3>Cấu Hình Bot Telegram & Cổng Thanh Toán SePay</h3>
-          <div style="max-width:550px;">
-            <div class="form-group">
-              <label>Telegram Bot Token</label>
-              <input type="password" id="cfgTeleToken" placeholder="123456:ABC-DEF...">
-            </div>
-            <div class="form-group">
-              <label>Telegram Admin Chat ID</label>
-              <input type="text" id="cfgTeleAdminID" placeholder="123456789">
-            </div>
-            <div class="form-group">
-              <label>SePay API Token</label>
-              <input type="password" id="cfgSePayToken" placeholder="SePay API Key">
-            </div>
-            <button class="btn btn-primary" onclick="saveTelebotConfig()">Lưu Cấu Hình</button>
-          </div>
-        </div>
-      </div>
+type managementRegistrationResponse struct {
+	Resources []pluginapi.ResourceRoute   `json:"resources"`
+	Routes    []pluginapi.ManagementRoute `json:"routes"`
+}
 
-      <div id="pane-autoevent" class="tab-pane">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <h3 style="margin:0;">Telegram Auto Event Userbot Subsystem</h3>
-            <div id="autoEventStatusPill"><span class="badge badge-success">Sẵn sàng</span></div>
-          </div>
-          <p style="color:var(--text-secondary);font-size:13px;">
-            Tự động theo dõi channel sự kiện và click button nhận quota vòng quay theo luồng sub-30
+func main() {}
+
+//export cliproxy_plugin_init
+func cliproxy_plugin_init(host *C.cliproxy_host_api, plugin *C.cliproxy_plugin_api) C.int {
+	if host == nil || plugin == nil {
+		return 1
+	}
+	plugin.abi_version = C.uint32_t(pluginabi.ABIVersion)
+	plugin.call = (C.cliproxy_plugin_call_fn)(C.cliproxyPluginCall)
+	plugin.free_buffer = (C.cliproxy_plugin_free_fn)(C.cliproxyPluginFree)
+	plugin.shutdown = (C.cliproxy_plugin_shutdown_fn)(C.cliproxyPluginShutdown)
+	return 0
+}
+
+//export cliproxyPluginCall
+func cliproxyPluginCall(method *C.char, request *C.uint8_t, requestLen C.size_t, response *C.cliproxy_buffer) C.int {
+	methodStr := C.GoString(method)
+	var reqBytes []byte
+	if requestLen > 0 && request != nil {
+		reqBytes = C.GoBytes(unsafe.Pointer(request), C.int(requestLen))
+	}
+	out, err := handleMethod(methodStr, reqBytes)
+	if err != nil {
+		out = errorEnvelope("internal_error", err.Error())
+	}
+	writeResponse(response, out)
+	return 0
+}
+
+//export cliproxyPluginFree
+func cliproxyPluginFree(ptr unsafe.Pointer, length C.size_t) {
+	if ptr != nil && length > 0 {
+		C.free(ptr)
+	}
+}
+
+//export cliproxyPluginShutdown
+func cliproxyPluginShutdown() {}
+
+func handleMethod(method string, request []byte) ([]byte, error) {
+	switch method {
+	case pluginabi.MethodPluginRegister, pluginabi.MethodPluginReconfigure:
+		return okEnvelope(suiteRegistration())
+	case pluginabi.MethodManagementRegister:
+		return okEnvelope(managementRegistrationResponse{
+			// One browser-navigable resource: the locked-state admin shell.
+			Resources: []pluginapi.ResourceRoute{{
+				Path:        resourceApp,
+				Menu:        "Bảng Giá & Quản Trị",
+				Description: "CLIProxyAPI VTeen Admin Suite & Bảng Giá Quản Trị.",
+			}},
+			// Authenticated diagnostic/health endpoint. No Menu so the host keeps
+			// it as a management API route (not a legacy resource).
+			Routes: []pluginapi.ManagementRoute{{
+				Method:      http.MethodGet,
+				Path:        healthRoute,
+				Description: "Authenticated service health and capability probe.",
+			}},
+		})
+	case pluginabi.MethodManagementHandle:
+		return handleManagement(request)
+	default:
+		return errorEnvelope("unknown_method", "unknown method: "+method), nil
+	}
+}
+
+func handleManagement(request []byte) ([]byte, error) {
+	var req pluginapi.ManagementRequest
+	if err := json.Unmarshal(request, &req); err != nil {
+		return errorEnvelope("invalid_request", "cannot parse management request"), nil
+	}
+
+	// Exact (method, path) dispatch only. Arbitrary or short paths are not
+	// owned by this plugin and fall through to 404.
+	key := req.Method + " " + req.Path
+	switch key {
+	case "GET " + resourceAppFullPath:
+		nonce := newNonce()
+		body := strings.ReplaceAll(appShellHTML, shellNonceTag, nonce)
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusOK,
+			Headers:    resourceHeaders(nonce),
+			Body:       []byte(body),
+		})
+	case "GET " + healthRouteFullPath:
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusOK,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body: mustJSON(map[string]any{
+				"version":      pluginVer,
+				"name":         pluginDisplayName,
+				"capabilities": []string{"health", "billing", "pricing", "keys", "auths", "logs", "banned_ips", "test"},
+			}),
+		})
+	default:
+		return okEnvelope(pluginapi.ManagementResponse{
+			StatusCode: http.StatusNotFound,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"error":"not_found"}`),
+		})
+	}
+}
+
+func suiteRegistration() registration {
+	return registration{
+		ManagementAPI: true,
+	}
+}
+
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return b
+}
+
+func okEnvelope(v any) ([]byte, error) {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	env := envelope{OK: true, Result: payload}
+	return json.Marshal(env)
+}
+
+func errorEnvelope(code, message string) []byte {
+	env := envelope{OK: false, Error: code + ": " + message}
+	b, _ := json.Marshal(env)
+	return b
+}
+
+func writeResponse(response *C.cliproxy_buffer, raw []byte) {
+	if response == nil || len(raw) == 0 {
+		return
+	}
+	buf := C.CBytes(raw)
+	response.ptr = buf
+	response.len = C.size_t(len(raw))
+}
